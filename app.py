@@ -5,10 +5,19 @@ import torchvision.transforms as T
 from fastai.vision.all import load_learner
 import gradio as gr
 
-# 1. Limit CPU threads to prevent CPU spikes on Render's 0.1 CPU core
+# 1. Bypass Gradio's internal loopback check on Render
+os.environ["no_proxy"] = "localhost,127.0.0.1,0.0.0.0"
+os.environ["NO_PROXY"] = "localhost,127.0.0.1,0.0.0.0"
+try:
+    import gradio.networking
+    gradio.networking.url_ok = lambda *args, **kwargs: True
+except Exception:
+    pass
+
+# 2. Limit CPU threads to prevent CPU spikes on Render's 0.1 CPU core
 torch.set_num_threads(1)
 
-# 2. Load model, extract the PyTorch network, and purge FastAI training overhead
+# 3. Load model, extract the PyTorch network, and purge FastAI training overhead
 learn = load_learner('supercars_5class_resnet34.pkl', cpu=True)
 labels = list(learn.dls.vocab)
 model = learn.model.eval()
@@ -17,14 +26,14 @@ model = learn.model.eval()
 del learn
 gc.collect()
 
-# 3. Standard image preparation (resizes high-res images before tensor math)
+# 4. Standard image preparation (resizes high-res images before tensor math)
 transform = T.Compose([
     T.Resize((384, 384)),
     T.ToTensor(),
     T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-# 4. Inference function
+# 5. Inference function
 def predict(img):
     img = img.convert("RGB")
     tensor = transform(img).unsqueeze(0)
@@ -35,7 +44,7 @@ def predict(img):
         
     return {labels[i]: float(probs[i]) for i in range(len(labels))}
 
-# 5. Gradio Web Interface
+# 6. Gradio Web Interface
 image = gr.Image(type="pil", label="Upload Supercar")
 label = gr.Label(num_top_classes=5, label="Prediction")
 
