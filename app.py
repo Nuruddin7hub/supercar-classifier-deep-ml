@@ -1,4 +1,3 @@
-cat << 'EOF' > app.py
 import os
 import threading
 import gradio as gr
@@ -6,20 +5,21 @@ import gradio as gr
 learn = None
 labels = []
 
-# 1. Load model in background so the port opens immediately
-def load_model():
+# 1. Load model in background so Render's port check passes immediately
+def init_model():
     global learn, labels
     from fastai.vision.all import load_learner
     learn = load_learner('supercars_5class_resnet34.pkl')
     labels = list(learn.dls.vocab)
+    print("Model loaded successfully!")
 
-threading.Thread(target=load_model, daemon=True).start()
+threading.Thread(target=init_model, daemon=True).start()
 
 # 2. Prediction function
 def predict(img):
     global learn, labels
     if learn is None:
-        load_model()
+        init_model()
     from fastai.vision.all import PILImage
     img = PILImage.create(img)
     pred, pred_idx, probs = learn.predict(img)
@@ -38,8 +38,7 @@ demo = gr.Interface(
     flagging_mode="never"
 )
 
-# 4. Launch server immediately so Render detects the port in <1 second
+# 4. Bind to Render's port immediately
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
     demo.launch(server_name="0.0.0.0", server_port=port)
-EOF
